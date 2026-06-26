@@ -101,7 +101,11 @@ export const TRANSLATIONS = {
     play: "Play",
     wait: "Wait",
     games: "Games",
-    status: "Status"
+    status: "Status",
+    strategyLabel: "Rotation Strategy",
+    strategyAll: "All 4 Rotate (1 Game)",
+    strategyStaggered: "Staggered Pairs (2 Games)",
+    gameCountBadge: "Game"
   },
   es: {
     // AuthModal
@@ -205,6 +209,10 @@ export const TRANSLATIONS = {
     play: "Juego",
     wait: "Espera",
     games: "Juegos",
-    status: "Estado"
+    status: "Estado",
+    strategyLabel: "Estrategia de Rotación",
+    strategyAll: "Rotar los 4 (1 Juego)",
+    strategyStaggered: "Parejas Escalonadas (2 Juegos)",
+    gameCountBadge: "Juego"
   }
 };

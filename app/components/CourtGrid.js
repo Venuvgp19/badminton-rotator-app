@@ -110,6 +110,25 @@ export default function CourtGrid({
                       >
                         {player ? (
                           <div className={`court-player-card ${player.skill.toLowerCase()}`}>
+                            {court.gamesOnCourt && court.gamesOnCourt[slot] > 0 && (
+                              <span className="game-count-indicator" style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                fontSize: '0.6rem',
+                                fontWeight: '800',
+                                background: 'rgba(0, 242, 254, 0.15)',
+                                color: 'var(--secondary)',
+                                border: '1px solid rgba(0, 242, 254, 0.3)',
+                                borderRadius: '4px',
+                                padding: '1px 4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.3px',
+                                lineHeight: '1'
+                              }}>
+                                {t.gameCountBadge || "Game"} {court.gamesOnCourt[slot]}/2
+                              </span>
+                            )}
                             <span className="court-player-name">{player.name}</span>
                             <span className="court-player-stats">
                               {player.gamesPlayed} {isEs ? 'pj' : 'gp'} | {t.wait}: {player.waitRounds}
@@ -151,6 +170,25 @@ export default function CourtGrid({
                       >
                         {player ? (
                           <div className={`court-player-card ${player.skill.toLowerCase()}`}>
+                            {court.gamesOnCourt && court.gamesOnCourt[slot] > 0 && (
+                              <span className="game-count-indicator" style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                fontSize: '0.6rem',
+                                fontWeight: '800',
+                                background: 'rgba(0, 242, 254, 0.15)',
+                                color: 'var(--secondary)',
+                                border: '1px solid rgba(0, 242, 254, 0.3)',
+                                borderRadius: '4px',
+                                padding: '1px 4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.3px',
+                                lineHeight: '1'
+                              }}>
+                                {t.gameCountBadge || "Game"} {court.gamesOnCourt[slot]}/2
+                              </span>
+                            )}
                             <span className="court-player-name">{player.name}</span>
                             <span className="court-player-stats">
                               {player.gamesPlayed} {isEs ? 'pj' : 'gp'} | {t.wait}: {player.waitRounds}

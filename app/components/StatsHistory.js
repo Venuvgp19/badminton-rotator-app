@@ -142,6 +142,30 @@ export default function StatsHistory({
               </div>
             </div>
 
+            {/* Rotation Strategy Selector */}
+            <div className="setting-item">
+              <label htmlFor="rotation-strategy">{t.strategyLabel}</label>
+              <select
+                id="rotation-strategy"
+                value={settings.rotationStrategy || 'all-4-rotate'}
+                onChange={(e) => onUpdateSettings({ rotationStrategy: e.target.value })}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-color)',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  color: 'var(--text-main)',
+                  outline: 'none',
+                  marginTop: '0.25rem',
+                  fontSize: '0.85rem',
+                  width: '100%'
+                }}
+              >
+                <option value="all-4-rotate">{t.strategyAll}</option>
+                <option value="staggered-2-in-2-out">{t.strategyStaggered}</option>
+              </select>
+            </div>
+
             {/* Passphrase Input (Admin Only) */}
             {isAdmin && (
               <div className="setting-item">

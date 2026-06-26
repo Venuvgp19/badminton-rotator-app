@@ -58,6 +58,12 @@ const normalizeCourts = (rawCourts) => {
       b1: court.players?.b1 || null,
       b2: court.players?.b2 || null,
     },
+    gamesOnCourt: {
+      a1: court.gamesOnCourt?.a1 || 0,
+      a2: court.gamesOnCourt?.a2 || 0,
+      b1: court.gamesOnCourt?.b1 || 0,
+      b2: court.gamesOnCourt?.b2 || 0,
+    },
     winner: court.winner || null
   }));
 };
@@ -177,9 +183,9 @@ export default function Home() {
   // Session Core State
   const [players, setPlayers] = useState([]);
   const [courts, setCourts] = useState([
-    { courtId: 1, players: { a1: null, a2: null, b1: null, b2: null }, winner: null },
-    { courtId: 2, players: { a1: null, a2: null, b1: null, b2: null }, winner: null },
-    { courtId: 3, players: { a1: null, a2: null, b1: null, b2: null }, winner: null }
+    { courtId: 1, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null },
+    { courtId: 2, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null },
+    { courtId: 3, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null }
   ]);
   const [history, setHistory] = useState([]);
   const [timer, setTimer] = useState({ round: 0, timeRemaining: 120 * 60, isActive: false, phase: 'play', startedAt: null });
@@ -188,6 +194,7 @@ export default function Home() {
     playDuration: 120,
     changeoverDuration: 2,
     rotationMode: 'smart-rotation',
+    rotationStrategy: 'all-4-rotate',
     voiceEnabled: true,
     volume: 0.8,
     autoScheduleEnabled: true,
@@ -585,9 +592,9 @@ export default function Home() {
                 loginTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               })),
               courts: [
-                { courtId: 1, players: { a1: null, a2: null, b1: null, b2: null }, winner: null },
-                { courtId: 2, players: { a1: null, a2: null, b1: null, b2: null }, winner: null },
-                { courtId: 3, players: { a1: null, a2: null, b1: null, b2: null }, winner: null }
+                { courtId: 1, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null },
+                { courtId: 2, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null },
+                { courtId: 3, players: { a1: null, a2: null, b1: null, b2: null }, gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 }, winner: null }
               ],
               timer: { round: 0, timeRemaining: 120 * 60, isActive: false, phase: 'play' },
               history: [],
@@ -595,6 +602,7 @@ export default function Home() {
                 playDuration: 120,
                 changeoverDuration: 2,
                 rotationMode: 'smart-rotation',
+                rotationStrategy: 'all-4-rotate',
                 voiceEnabled: true,
                 volume: 0.8,
                 autoScheduleEnabled: true,
@@ -886,6 +894,7 @@ export default function Home() {
                 a2: toPlace[2] || null,
                 b2: toPlace[3] || null
               },
+              gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 },
               winner: null
             };
           }
@@ -945,6 +954,7 @@ export default function Home() {
       const resetCourts = courts.map(c => ({
         ...c,
         players: { a1: null, a2: null, b1: null, b2: null },
+        gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 },
         winner: null
       }));
       
@@ -1197,7 +1207,11 @@ export default function Home() {
 
     const updatedCourts = courts.map(ct => {
       if (ct.courtId === courtId) {
-        return { ...ct, players: currentCourtPlayers };
+        const nextGamesOnCourt = { ...(ct.gamesOnCourt || { a1: 0, a2: 0, b1: 0, b2: 0 }) };
+        emptySlots.forEach(slot => {
+          nextGamesOnCourt[slot] = 0;
+        });
+        return { ...ct, players: currentCourtPlayers, gamesOnCourt: nextGamesOnCourt };
       }
       return ct;
     });
@@ -1219,10 +1233,40 @@ export default function Home() {
     if (!targetCourt) return;
 
     const cp = targetCourt.players;
-    const rotatingPlayerIds = [];
+    const currentGamesOnCourt = { ...(targetCourt.gamesOnCourt || { a1: 0, a2: 0, b1: 0, b2: 0 }) };
+
+    // Increment game counts for anyone currently on the court
     for (let s in cp) {
-      if (cp[s]) rotatingPlayerIds.push(cp[s].id);
+      if (cp[s]) {
+        currentGamesOnCourt[s] = (currentGamesOnCourt[s] || 0) + 1;
+      } else {
+        currentGamesOnCourt[s] = 0;
+      }
     }
+
+    // Determine slots to clear based on the rotation strategy
+    const slotsToClear = [];
+    if (settingsRef.current.rotationStrategy === 'staggered-2-in-2-out') {
+      // Stagger Bootstrap: if all active slots are exactly at 1 game, rotate out 2 players early
+      const isBootstrap = Object.values(cp).every(Boolean) && Object.values(currentGamesOnCourt).every(val => val === 1);
+      if (isBootstrap) {
+        slotsToClear.push('a1', 'a2');
+      } else {
+        for (let s in currentGamesOnCourt) {
+          if (currentGamesOnCourt[s] >= 2) {
+            slotsToClear.push(s);
+          }
+        }
+      }
+    } else {
+      // Default: Rotate everyone
+      slotsToClear.push('a1', 'b1', 'a2', 'b2');
+    }
+
+    const rotatingPlayerIds = [];
+    slotsToClear.forEach(s => {
+      if (cp[s]) rotatingPlayerIds.push(cp[s].id);
+    });
 
     // 1. Log histories of current matches
     const newLogs = [];
@@ -1300,19 +1344,32 @@ export default function Home() {
       return p;
     });
 
-    // 3. Clear target court in local temporary state
+    // 3. Setup temporary local courts state with staying players
+    const currentCourtPlayers = {};
+    const nextGamesOnCourt = { ...currentGamesOnCourt };
+    const slotKeys = ['a1', 'b1', 'a2', 'b2'];
+    for (let s of slotKeys) {
+      if (slotsToClear.includes(s)) {
+        currentCourtPlayers[s] = null;
+        nextGamesOnCourt[s] = 0;
+      } else {
+        currentCourtPlayers[s] = cp[s];
+      }
+    }
+
     let nextCourts = courtsRef.current.map(c => {
       if (c.courtId === courtId) {
         return {
           ...c,
-          players: { a1: null, a2: null, b1: null, b2: null },
+          players: currentCourtPlayers,
+          gamesOnCourt: nextGamesOnCourt,
           winner: null
         };
       }
       return c;
     });
 
-    // 4. Find and sort the waiting queue to select 4 players to put on this court.
+    // 4. Find and sort the waiting queue to select players to put on this court.
     let waiting = copyPlayers.filter(p => p.status === 'waiting');
     
     waiting.forEach(p => {
@@ -1321,11 +1378,10 @@ export default function Home() {
     waiting.sort((a, b) => a._priorityScore - b._priorityScore);
 
     const toPlace = [];
-    const currentCourtPlayers = { a1: null, a2: null, b1: null, b2: null };
-    const slotKeys = ['a1', 'b1', 'a2', 'b2'];
 
     // Pass 1: Try strict constraints
     for (const slotId of slotKeys) {
+      if (currentCourtPlayers[slotId]) continue; // Skip staying players
       let foundIdx = -1;
       for (let i = 0; i < waiting.length; i++) {
         const p = waiting[i];
@@ -1344,7 +1400,7 @@ export default function Home() {
 
     // Pass 2: Try relaxed constraints
     for (const slotId of slotKeys) {
-      if (currentCourtPlayers[slotId]) continue;
+      if (currentCourtPlayers[slotId]) continue; // Skip staying players
       let foundIdx = -1;
       for (let i = 0; i < waiting.length; i++) {
         const p = waiting[i];
@@ -1365,10 +1421,14 @@ export default function Home() {
     if (toPlace.length === 4) {
       const skillWeights = { 'Pro': 4, 'Advanced': 3, 'Intermediate': 2, 'Beginner': 1 };
       toPlace.sort((a, b) => skillWeights[b.skill] - skillWeights[a.skill]);
+      currentCourtPlayers.a1 = toPlace[0] || null;
+      currentCourtPlayers.b1 = toPlace[1] || null;
+      currentCourtPlayers.a2 = toPlace[2] || null;
+      currentCourtPlayers.b2 = toPlace[3] || null;
     }
     const placeIds = toPlace.map(x => x.id);
 
-    // 5. Update status of the 4 new players to 'playing'
+    // 5. Update status of the new players to 'playing'
     // And for players who are still waiting (were not selected AND did not just rotate out), increment waitRounds!
     const { isScheduledActive: isaRotate } = getScheduledTimerState();
     const isTimerRunningRotate = timer.isActive || isaRotate;
@@ -1400,12 +1460,7 @@ export default function Home() {
       if (c.courtId === courtId) {
         return {
           ...c,
-          players: {
-            a1: toPlace[0] || null,
-            b1: toPlace[1] || null,
-            a2: toPlace[2] || null,
-            b2: toPlace[3] || null
-          }
+          players: currentCourtPlayers
         };
       }
       return c;
@@ -1733,14 +1788,16 @@ export default function Home() {
     // 1. Remove player from any current court
     let cleanedCourts = courts.map(c => {
       const copy = { ...c.players };
+      const nextGamesOnCourt = { ...(c.gamesOnCourt || { a1: 0, a2: 0, b1: 0, b2: 0 }) };
       let changed = false;
       for (let s in copy) {
         if (copy[s] && copy[s].id === playerId) {
           copy[s] = null;
+          nextGamesOnCourt[s] = 0;
           changed = true;
         }
       }
-      return changed ? { ...c, players: copy } : c;
+      return changed ? { ...c, players: copy, gamesOnCourt: nextGamesOnCourt } : c;
     });
 
     // 2. Identify player currently in slot to send back to queue
@@ -1755,7 +1812,9 @@ export default function Home() {
       if (c.courtId === courtId) {
         const copy = { ...c.players };
         copy[slotId] = player;
-        return { ...c, players: copy };
+        const nextGamesOnCourt = { ...(c.gamesOnCourt || { a1: 0, a2: 0, b1: 0, b2: 0 }) };
+        nextGamesOnCourt[slotId] = 0;
+        return { ...c, players: copy, gamesOnCourt: nextGamesOnCourt };
       }
       return c;
     });
@@ -1816,6 +1875,7 @@ export default function Home() {
       const resetCourts = courts.map(c => ({
         ...c,
         players: { a1: null, a2: null, b1: null, b2: null },
+        gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 },
         winner: null
       }));
       const resetTimer = { round: 0, timeRemaining: settings.playDuration * 60, isActive: false, phase: 'play', startedAt: null };
@@ -1854,6 +1914,7 @@ export default function Home() {
       const resetCourts = courts.map(c => ({
         ...c,
         players: { a1: null, a2: null, b1: null, b2: null },
+        gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 },
         winner: null
       }));
       
@@ -2012,6 +2073,7 @@ export default function Home() {
     let nextCourts = courts.map(c => ({
       ...c,
       players: { a1: null, a2: null, b1: null, b2: null },
+      gamesOnCourt: { a1: 0, a2: 0, b1: 0, b2: 0 },
       winner: null
     }));
 
@@ -2520,10 +2582,47 @@ export default function Home() {
 
     const toPlace = [];
     const currentCourtPlayers = { a1: null, a2: null, b1: null, b2: null };
+
+    // If the court is occupied and rotation strategy is staggered, find staying players
+    const targetCourt = courts.find(c => c.courtId === courtId);
+    if (targetCourt && settings.rotationStrategy === 'staggered-2-in-2-out') {
+      const cp = targetCourt.players || {};
+      const games = targetCourt.gamesOnCourt || { a1: 0, a2: 0, b1: 0, b2: 0 };
+      
+      // Simulate incrementing game counts to see who rotates out
+      const simulatedGames = {};
+      for (let s in cp) {
+        if (cp[s]) {
+          simulatedGames[s] = (games[s] || 0) + 1;
+        } else {
+          simulatedGames[s] = 0;
+        }
+      }
+      
+      const isBootstrap = Object.values(cp).every(Boolean) && Object.values(simulatedGames).every(val => val === 1);
+      const slotsToClear = [];
+      if (isBootstrap) {
+        slotsToClear.push('a1', 'a2');
+      } else {
+        for (let s in simulatedGames) {
+          if (simulatedGames[s] >= 2) {
+            slotsToClear.push(s);
+          }
+        }
+      }
+      
+      for (let s in cp) {
+        if (cp[s] && !slotsToClear.includes(s)) {
+          currentCourtPlayers[s] = cp[s];
+        }
+      }
+    }
+
     const slotKeys = ['a1', 'b1', 'a2', 'b2'];
 
     // Pass 1: Try strict constraints
     for (const slotId of slotKeys) {
+      if (currentCourtPlayers[slotId]) continue;
       let foundIdx = -1;
       for (let i = 0; i < waiting.length; i++) {
         const p = waiting[i];
@@ -2559,14 +2658,25 @@ export default function Home() {
       }
     }
 
+    // If 4 players are selected, we sort toPlace by skill weight to match actual team split
+    if (toPlace.length === 4) {
+      const skillWeights = { 'Pro': 4, 'Advanced': 3, 'Intermediate': 2, 'Beginner': 1 };
+      toPlace.sort((a, b) => skillWeights[b.skill] - skillWeights[a.skill]);
+    }
+
     return toPlace;
   };
 
-  const courtsWithNextUp = courts.map(c => ({
-    ...c,
-    isActive: activeCourtsList.includes(c.courtId),
-    nextUp: getNextUpPlayersForCourt(c.courtId)
-  }));
+  const courtsWithNextUp = courts.map(c => {
+    const nextUp = getNextUpPlayersForCourt(c.courtId);
+    const playerCount = Object.values(c.players || {}).filter(Boolean).length;
+    const isStaggered = settings.rotationStrategy === 'staggered-2-in-2-out';
+    return {
+      ...c,
+      isActive: activeCourtsList.includes(c.courtId),
+      nextUp: (isStaggered && playerCount > 0) ? nextUp.slice(0, 2) : nextUp
+    };
+  });
 
   return (
     <div className={`app-container mobile-view-${activeMobileTab}`}>

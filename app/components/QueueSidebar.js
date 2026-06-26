@@ -154,7 +154,19 @@ export default function QueueSidebar({
                           {player.name} {isCurrentUser && `(${isEs ? 'Tú' : 'You'})`}
                         </span>
                         <span className="player-subtext">
-                          {t.games}: {player.gamesPlayed} | {t.play}: {getPlayerTimeStrings(player).playStr} | {t.wait}: {getPlayerTimeStrings(player).waitStr} ({player.waitRounds} {isEs ? 'rondas' : 'rd'}) | {player.phone}{player.loginTime ? ` | ${isEs ? 'Entrada' : 'In'}: ${player.loginTime}` : ''}
+                          <span>{t.games}: {player.gamesPlayed}</span>
+                          <span className="separator"> | </span>
+                          <span>{t.play}: {getPlayerTimeStrings(player).playStr}</span>
+                          <span className="separator"> | </span>
+                          <span>{t.wait}: {getPlayerTimeStrings(player).waitStr} ({player.waitRounds} {isEs ? 'rondas' : 'rd'})</span>
+                          <span className="separator hide-mobile"> | </span>
+                          <span className="hide-mobile">{player.phone}</span>
+                          {player.loginTime && (
+                            <>
+                              <span className="separator hide-mobile"> | </span>
+                              <span className="hide-mobile">{isEs ? 'Entrada' : 'In'}: {player.loginTime}</span>
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -296,7 +308,21 @@ export default function QueueSidebar({
                           {player.name} {isCurrentUser && `(${isEs ? 'Tú' : 'You'})`}
                         </span>
                         <span className="player-subtext">
-                          {t.games}: {player.gamesPlayed} | {t.play}: {getPlayerTimeStrings(player).playStr} | {t.wait}: {getPlayerTimeStrings(player).waitStr} | {t.status}: {t[player.status + "Status"] || player.status} | {player.phone}{player.loginTime ? ` | ${isEs ? 'Entrada' : 'In'}: ${player.loginTime}` : ''}
+                          <span>{t.games}: {player.gamesPlayed}</span>
+                          <span className="separator"> | </span>
+                          <span>{t.play}: {getPlayerTimeStrings(player).playStr}</span>
+                          <span className="separator"> | </span>
+                          <span>{t.wait}: {getPlayerTimeStrings(player).waitStr}</span>
+                          <span className="separator"> | </span>
+                          <span>{t.status}: {t[player.status + "Status"] || player.status}</span>
+                          <span className="separator hide-mobile"> | </span>
+                          <span className="hide-mobile">{player.phone}</span>
+                          {player.loginTime && (
+                            <>
+                              <span className="separator hide-mobile"> | </span>
+                              <span className="hide-mobile">{isEs ? 'Entrada' : 'In'}: {player.loginTime}</span>
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>
