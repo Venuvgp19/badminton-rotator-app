@@ -23,7 +23,7 @@ pipeline {
         stage('Build Image') {
             steps {
                 echo 'Building container image using Podman...'
-                sh 'sudo podman build -t ${IMAGE_NAME} .'
+                sh 'sudo podman build --network=host -t ${IMAGE_NAME} .'
             }
         }
 
