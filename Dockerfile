@@ -1,29 +1,24 @@
-# Stage 1: Install dependencies
-FROM node:20-alpine AS deps
+FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
+
 ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+ENV NODE_ENV=production
+
+# 1. Copy only package configuration to verify cache
+COPY package*.json ./
+
+# 2. Install dependencies with persistent npm cache mount
 RUN --mount=type=cache,target=/root/.npm \
     npm config set registry https://registry.npmmirror.com && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-retries 5 && \
     npm ci
 
-# Stage 2: Build the application
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# 3. Copy source files
 COPY . .
-RUN --mount=type=cache,target=/app/.next/cache npm run build
 
-# Stage 3: Runner
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
+# 4. Compile Next.js with persistent compiler cache mount
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 EXPOSE 3000
 CMD ["npm", "start"]
