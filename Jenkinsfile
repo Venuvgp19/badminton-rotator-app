@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'localhost/badminton-rotator-app:latest'
+        IMAGE_NAME = 'docker.io/venuvgp19/badminton_rotator:latest'
     }
 
     stages {
@@ -27,10 +27,13 @@ pipeline {
             }
         }
 
-        stage('Import to Containerd') {
+        stage('Push Image') {
             steps {
-                echo 'Importing container image into Kubernetes containerd namespace...'
-                sh 'sudo podman save ${IMAGE_NAME} | sudo ctr -n=k8s.io images import -'
+                echo 'Logging in and pushing image to Docker Hub...'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    sh 'sudo podman login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD docker.io'
+                    sh 'sudo podman push ${IMAGE_NAME}'
+                }
             }
         }
 
