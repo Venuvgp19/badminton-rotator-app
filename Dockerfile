@@ -3,7 +3,8 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 ENV NODE_OPTIONS="--dns-result-order=ipv4first"
-RUN npm config set registry https://registry.npmmirror.com && \
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set registry https://registry.npmmirror.com && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-retries 5 && \
     npm ci
@@ -13,7 +14,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Stage 3: Runner
 FROM node:20-alpine AS runner
