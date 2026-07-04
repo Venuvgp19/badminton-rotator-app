@@ -1,155 +1,60 @@
-# Badminton Rotator App: Production-Grade Kubernetes & GitOps CI/CD Lab
+# 🏸 Badminton Rotator App & CI/CD Pipeline
 
-A fully automated DevOps pipeline deploying a Next.js court rotation app onto a multi-node Kubernetes cluster. This project demonstrates high-availability clustering, automated CI pipelines with Jenkins/Podman, and GitOps CD reconciliation using Argo CD, integrated on a custom virtualized dual-NIC network topology.
+A production-grade, automated CI/CD pipeline deploying **Badminton Rotator Pro**—a premium Next.js court rotation and session queue manager—to a multi-node Kubernetes cluster.
 
 ---
 
-## 🏗️ Architecture Overview
+## 📱 About the Application
 
-The infrastructure consists of two CentOS Stream VMs running in Oracle VirtualBox, orchestrating a production-like GitOps delivery loop:
+**Badminton Rotator Pro** is a modern Next.js web application designed to manage court schedules, player queues, and game matches for badminton clubs:
+*   **Smart Court Rotation**: Automatically balances and schedules balanced, fair matches based on queues.
+*   **Queue Management**: Real-time queues tracking waiting times and court status.
+*   **Premium Aesthetics**: Sleek, high-performance dark user interface styled with Tailwind CSS, supporting seamless micro-animations.
+
+---
+
+## 🚀 CI/CD Pipeline & Deployment Architecture
+
+The application is deployed automatically through a continuous delivery pipeline powered by Jenkins, Podman, Docker Hub, and Kubernetes:
 
 ```mermaid
-graph TD
-    %% Developer Actions
-    Dev([Developer]) -->|1. Push Code| Git[GitHub Repository]
+graph LR
+    Dev([Developer]) -->|1. Push Code| GitHub[GitHub Repo]
     
-    %% CI Pipeline (Jenkins)
-    subgraph ControlPlaneVM ["ControlPlane Node (192.168.100.101)"]
-        Jenkins[Jenkins Server] -->|2. Detects Commit| Build[Podman Build Image]
-        Build -->|3. Local Import| K8sCP[containerd Namespace]
-        Build -->|4. SCP Tar Stream| SSH[Secure SSH Pipe]
+    subgraph Control Plane VM
+        Jenkins[Jenkins Server] -->|2. Pulls Changes| Podman[Podman Container Builder]
+        Podman -->|3. Optimized Build| Dockerfile[Multi-Stage Dockerfile]
+        Podman -->|4. Push Image| DockerHub[Docker Hub Registry]
     end
 
-    %% Worker Node Image Import
-    subgraph WorkerNodeVM ["WorkerNode1 Node (192.168.100.102)"]
-        SSH -->|5. Local Import| K8sWorker[containerd Namespace]
+    subgraph Kubernetes Cluster
+        Kubelet[Kubelet Service] -->|5. Triggers Rollout| Deploy[Kubernetes Deployment]
+        Deploy -->|6. Pulls Image| DockerHub
+        Deploy -->|7. Serves Traffic| Service[NodePort Service :30080]
     end
-
-    %% GitOps CD Loop
-    subgraph KubernetesCluster ["Kubernetes Cluster"]
-        ArgoCD[Argo CD Controller] -->|6. Monitors Manifests| Git
-        ArgoCD -->|7. Reconciles State| Deployments[Deployments & Services]
-        Deployments -->|8. Run Pods| K8sCP
-        Deployments -->|8. Run Pods| K8sWorker
-    end
-
-    %% Client Access
-    User([End User]) -->|Access App via NodePort 30080| Deployments
 ```
 
----
+### 1. Continuous Integration (Jenkins + Podman)
+*   **Automated Triggers**: SCM change triggers the Jenkins pipeline automatically on code push.
+*   **Multi-Stage Podman Build**: Podman builds the production-ready Next.js image using an optimized multi-stage `Dockerfile`.
+*   **Compilation Cache Mounts**: 
+    *   `--mount=type=cache,target=/root/.npm` for caching npm dependencies.
+    *   `--mount=type=cache,target=/app/.next/cache` for caching Next.js compilation targets.
+    *   Uses high-speed regional mirror registries (`registry.npmmirror.com`) to drastically cut down dependency download times.
 
-## 🌐 1. VM Network Architecture
+### 2. Registry Pushing (Docker Hub)
+*   **Secure Authentication**: Jenkins logs in using Docker Hub credentials loaded from the secure Jenkins Credential Store.
+*   **Image Repository**: Image is tagged and pushed to the public repository `docker.io/venuvgp19/badminton_rotator:latest`.
 
-To simulate a real-world enterprise lab environment, the VMs are configured with a **Dual-NIC network topology**:
-
-*   **Network 1 (Host-Only, `enp0s3`)**: Used for secure node-to-node cluster communication and host-to-VM SSH access.
-    *   **ControlPlane IP**: `192.168.100.101`
-    *   **WorkerNode1 IP**: `192.168.100.102`
-*   **Network 2 (NAT, `enp0s8`)**: Dedicated to outbound internet access.
-
-### Default Gateway Configuration
-To ensure DNS resolving and outbound package downloading work while retaining SSH connectivity, the default gateway of the Host-Only network connection was cleared, leaving the NAT interface as the primary default route:
-```bash
-# Clear default gateway from Host-Only connection
-sudo nmcli connection modify enp0s3 ipv4.gateway ''
-sudo nmcli device reapply enp0s3
-```
+### 3. Continuous Deployment (Kubernetes Rolling Update)
+*   **Rolling Deployments**: The pipeline runs `kubectl apply -f k8s-deployment.yaml` to trigger a rolling update.
+*   **Anonymous Image Pull**: Since the repository is public, Kubernetes worker nodes pull the latest image anonymously without needing credentials.
+*   **Zero-Downtime Rollout**: Pods transition seamlessly from old replicas to the new container build.
 
 ---
 
-## ☸️ 2. Kubernetes Cluster Setup & Dual-NIC Fixes
+## 🌐 How to Access the App
 
-In a multi-NIC environment, the Kubelet registry default behavior binds to the primary routing interface (which is the NAT interface DHCP IP `10.0.3.15` for both nodes), causing IP collisions and cluster routing failures.
-
-### Kubelet Custom IP Configuration
-To force the Kubelet service to bind onto the static Host-Only network, the node IP parameters were overridden in `/var/lib/kubelet/kubeadm-flags.env` on both nodes:
-*   **ControlPlane**: `--node-ip=192.168.100.101`
-*   **WorkerNode1**: `--node-ip=192.168.100.102`
-
-```bash
-# Apply and restart kubelet
-sudo systemctl daemon-reload && sudo systemctl restart kubelet
-```
-
-### Flannel CNI Bindings
-The Flannel daemonset CNI configuration was patched to bind exclusively to the Host-Only interface (`enp0s3`), preventing pods from trying to route across the isolated NAT network:
-```bash
-kubectl patch daemonset kube-flannel-ds -n kube-flannel -p \
-  'spec: {template: {spec: {containers: [{name: kube-flannel, args: [--ip-masq, --kube-subnet-mgr, --iface=enp0s3]}]}}}'
-```
-
----
-
-## 🛠️ 3. CI Pipeline (Jenkins + Podman)
-
-The Jenkins CI pipeline runs on the `ControlPlane` node and performs the container build and containerd image injection:
-
-1.  **Checkout**: Pulls code changes from the repository.
-2.  **Container Build**: Uses Podman with `--network=host` to build the Next.js application in a lightweight multi-stage Docker environment.
-3.  **Local Containerd Import**: Imports the built image into the local Control Plane Kubernetes runtime:
-    ```bash
-    sudo podman save localhost/badminton-rotator-app:latest | sudo ctr -n=k8s.io images import -
-    ```
-4.  **Worker Node Containerd Import**: Streams the image directly from the Control Plane to the Worker Node runtime using a secure memory/network pipe:
-    ```bash
-    sudo podman save localhost/badminton-rotator-app:latest | ssh root@192.168.100.102 "ctr -n=k8s.io images import -"
-    ```
-
----
-
-## 🔁 4. CD Pipeline (Argo CD & GitOps)
-
-Argo CD manages the target state of the cluster by pulling manifests directly from the repository.
-
-### Argo CD Application Definition
-The application is defined using Argo CD's custom resource definitions. It utilizes a file inclusion pattern to parse only the Kubernetes deployment file, ignoring the local application source configuration:
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: badminton-rotator
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: 'https://github.com/Venuvgp19/badminton-rotator-app.git'
-    targetRevision: HEAD
-    path: .
-    directory:
-      include: 'k8s-deployment.yaml'
-  destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-```
-
----
-
-## 🔧 5. Troubleshooting & SRE Case Study
-
-### Case Study: Node DiskPressure & Pod Evictions
-During the container compilation phase, high disk space consumption on the Control Plane node triggered Kubelet's `DiskPressure` threshold:
-
-*   **The Issue**: Kubelet initiated an **Image Garbage Collection** sweep, evicting the inactive `badminton-rotator` pods and deleting the local `localhost/badminton-rotator-app:latest` image to free space, causing subsequent pods to enter `ImagePullBackOff`.
-*   **The Fix**:
-    1.  Executed a Podman system prune to safely clear intermediate layers and free disk space below the threshold:
-        ```bash
-        sudo podman system prune -a -f
-        ```
-    2.  Recovered the lost image by streaming it back from `WorkerNode1` via containerd export/import pipelines:
-        ```bash
-        ssh root@192.168.100.102 "ctr -n=k8s.io images export - localhost/badminton-rotator-app:latest" | sudo ctr -n=k8s.io images import -
-        ```
-    3.  Cleaned up the evicted pod history to allow the ReplicaSet controller to immediately reschedule and spin up healthy running pods.
-
----
-
-## 🚀 How to Run the App
-
-Once deployed, the app is exposed via a NodePort Service on port **`30080`**. Access it via:
-*   `http://192.168.100.101:30080` (ControlPlane IP)
-*   `http://192.168.100.102:30080` (WorkerNode1 IP)
+Once deployed, the application is exposed externally via a NodePort Service on port **`30080`**:
+*   **Primary Endpoint**: `http://192.168.100.101:30080`
+*   **Secondary Endpoint**: `http://192.168.100.102:30080`
