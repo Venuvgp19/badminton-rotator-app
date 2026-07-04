@@ -1,4 +1,4 @@
-# Trigger Build 15
+# Trigger Build 16
 FROM node:20-alpine
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm config set registry https://registry.npmmirror.com && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-retries 5 && \
-    npm ci
+    npm ci --include=dev
 
 # 3. Copy source files
 COPY . .
