@@ -14,19 +14,19 @@ graph TD
     Dev([Developer]) -->|1. Push Code| Git[GitHub Repository]
     
     %% CI Pipeline (Jenkins)
-    subgraph ControlPlane VM [ControlPlane Node (192.168.100.101)]
+    subgraph ControlPlaneVM ["ControlPlane Node (192.168.100.101)"]
         Jenkins[Jenkins Server] -->|2. Detects Commit| Build[Podman Build Image]
         Build -->|3. Local Import| K8sCP[containerd Namespace]
         Build -->|4. SCP Tar Stream| SSH[Secure SSH Pipe]
     end
 
     %% Worker Node Image Import
-    subgraph WorkerNode VM [WorkerNode1 Node (192.168.100.102)]
+    subgraph WorkerNodeVM ["WorkerNode1 Node (192.168.100.102)"]
         SSH -->|5. Local Import| K8sWorker[containerd Namespace]
     end
 
     %% GitOps CD Loop
-    subgraph Kubernetes Cluster [Kubernetes Cluster]
+    subgraph KubernetesCluster ["Kubernetes Cluster"]
         ArgoCD[Argo CD Controller] -->|6. Monitors Manifests| Git
         ArgoCD -->|7. Reconciles State| Deployments[Deployments & Services]
         Deployments -->|8. Run Pods| K8sCP
