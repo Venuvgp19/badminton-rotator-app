@@ -19,7 +19,7 @@ import { TRANSLATIONS } from './translations';
 const DEFAULT_PLAYERS = [];
 
 const REAL_WORLD_PLAYERS = [
-  { id: "player_1", name: "Venu", phone: "5575137803", skill: "Advanced" },
+  { id: "player_1", name: "Venu", phone: "8892137015", skill: "Advanced" },
   { id: "player_2", name: "Balakrishnan", phone: "4423430616", skill: "Pro" },
   { id: "player_3", name: "Narendra Thakur", phone: "4421129890", skill: "Advanced" },
   { id: "player_4", name: "Leo", phone: "4623082330", skill: "Pro" },
