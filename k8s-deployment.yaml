@@ -5,7 +5,7 @@ metadata:
   labels:
     app: badminton-rotator
 spec:
-  replicas: 6
+  replicas: 1
   selector:
     matchLabels:
       app: badminton-rotator
